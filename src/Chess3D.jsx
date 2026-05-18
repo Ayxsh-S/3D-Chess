@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
@@ -191,45 +191,80 @@ function useModelMetrics(nodes) {
     }, [nodes]);
 }
 
-function PieceModel({ template, targetCenter, onClick }) {
-    const group = useRef();
-
-    const clone = useMemo(() => template.clone(true), [template]);
-
-    const modelCenter = useMemo(() => {
-        if (!clone.geometry.boundingBox) {
-            clone.geometry.computeBoundingBox();
-        }
-        return clone.geometry.boundingBox.getCenter(new THREE.Vector3());
-    }, [clone]);
-
-    const desiredGroupPos = useMemo(() => targetCenter.clone().sub(modelCenter), [targetCenter, modelCenter]);
-
-    useLayoutEffect(() => {
-        group.current?.position.copy(desiredGroupPos);
-    }, [desiredGroupPos]);
-
+function PieceModel({ geometry, material, position, onClick }) {
     return (
-        <group
-            ref={group}
+        <mesh
+            geometry={geometry}
+            material={material}
+            position={position}
             onPointerDown={(e) => {
                 e.stopPropagation();
                 onClick?.();
             }}
-        >
-            <primitive object={clone} />
-        </group>
+        />
     );
 }
 
 const MODEL_ROTATION = [-Math.PI/2, 0, 0];
 const MODEL_POSITION = [-7.6072488, -18.6398945, -4.616249];
 
+function makeReusablePieceTemplate(template) {
+    const cloned = template.clone(true);
+    cloned.updateWorldMatrix(true, true);
+
+    const mesh = cloned.isMesh ? cloned : cloned.children.find((child) => child.isMesh);
+
+    if (!mesh) return null;
+
+    const geometry = mesh.geometry.clone();
+    geometry.applyMatrix4(mesh.matrixWorld);
+
+    if (!geometry.boundingBox) {
+        geometry.computeBoundingBox();
+    }
+
+    const box = geometry.boundingBox.clone();
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    geometry.translate(-center.x, -center.y, -center.z);
+
+    const material = Array.isArray(mesh.material) ? mesh.material.map((m) => m.clone()) : mesh.material.clone();
+
+    return {
+        geometry,
+        material,
+        center,
+        size,
+    };
+}
+
 function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orientation, onSquareClick} ) {
     const { nodes } = useGLTF("/chess.glb");
     const metrics = useModelMetrics(nodes);
 
     const templateMap = useMemo(() => getTemplateMap(nodes), [nodes]);
+
+    // useEffect(() => {
+    //     const matteBoard = (root) => {
+    //         if (!root) return;
+    //         root.traverse((obj) => {
+    //             if (!obj.isMesh || !obj.material) return;
+
+    //             const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+    //             materials.forEach((mat) => {
+    //                 if (!mat) return;
+    //                 mat.roughness = 1;
+    //                 mat.metalness = 0;
+    //                 mat.envMapIntensity = 0;
+    //                 mat.needsUpdate = true;
+    //             });
+    //         });
+    //     };
+
+    //     matteBoard(nodes.Board);
+    //     matteBoard(nodes.Board_Under);
+    // }, [nodes]);
 
     const pieceInfo = useMemo(() => {
         const info = {};
@@ -238,16 +273,10 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                 const template = templateMap[color][type];
                 if (!template) continue;
 
-                if (!template.geometry.boundingBox) {
-                    template.geometry.computeBoundingBox();
-                }
-            
-                const center = template.geometry.boundingBox.getCenter(new THREE.Vector3());
+                const prepared = makeReusablePieceTemplate(template);
+                if (!prepared) continue
 
-                info[`${color}-${type}`] = {
-                    template,
-                    center,
-                };
+                info[`${color}-${type}`] = prepared;
             }
         }
         return info;
@@ -317,7 +346,7 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                 const { fileIdx, rankIdx } = getRankFile(piece.square);
                 const shownFile = orientation === "white" ? fileIdx : 7-fileIdx;
                 const shownRank = orientation === "white" ? rankIdx : 7-rankIdx;
-                const targetCenter = new THREE.Vector3(
+                const position = new THREE.Vector3(
                     metrics.minX+metrics.square/2+shownFile*metrics.square,
                     metrics.minY+metrics.square/2+shownRank*metrics.square,
                     info.center.z
@@ -326,8 +355,9 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                 return (
                     <PieceModel 
                         key={piece.id}
-                        template={info.template}
-                        targetCenter={targetCenter}
+                        geometry={info.geometry}
+                        material={info.material}
+                        position={position}
                         onClick={() => onSquareClick(piece.square)}
                     />
                 );
@@ -496,18 +526,22 @@ export default function Chess3D() {
                 <Canvas
                     frameloop="demand"
                     camera={{ position: [0, 20, 24], fov: 42, near: 0.1, far: 200 }}
-                    dpr={[1, 1.25]}
+                   
                     gl={{ 
-                        antialias: false,
+                        antialias: true,
+                        physicallyCorrectLights: true,
+                        toneMapping: THREE.ACESFilmicToneMapping,
+                        toneMappingExposure: 1.0,
+                        outputColorSpace: THREE.SRGBColorSpace,
                         powerPreference: "high-performance",
                         alpha: false,
                     }}
                 >
                     <color attach="background" args={["#101317"]} />
-                    <Environment preset="apartment"  />
-                    <ambientLight intensity={0.86} />
-                    <directionalLight position={[10, 18, 12]} intensity={1} />
-                    <directionalLight position={[-10, 8, -12]} intensity={0.25} />
+                    <Environment preset="studio" background={false} environmentIntensity={1} />
+                    <ambientLight intensity={0.35} />
+                    <directionalLight position={[10, 18, 12]} intensity={1.2}/>
+                    <directionalLight position={[-6, 6, -8]} intensity={0.25} />
                     <Suspense fallback={null}>
                         <ChessBoardScene
                             pieces={pieces}
