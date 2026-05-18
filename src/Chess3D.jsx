@@ -191,18 +191,6 @@ function useModelMetrics(nodes) {
     }, [nodes]);
 }
 
-function squareToWorld(square, orientation, metrics, y) {
-    const { fileIdx, rankIdx } = getRankFile(square);
-    const shownFile = orientation === "white" ? fileIdx : 7-fileIdx;
-    const shownRank = orientation === "white" ? rankIdx : 7-rankIdx;
-
-    return new THREE.Vector3(
-        metrics.minX+metrics.square/2+shownFile*metrics.square,
-        metrics.minY+metrics.square/2+shownRank*metrics.square,
-        z
-    );
-}
-
 function PieceModel({ template, targetCenter, onClick }) {
     const group = useRef();
 
@@ -506,8 +494,9 @@ export default function Chess3D() {
         <div className="container">
             <div className="sub-container">
                 <Canvas
+                    frameloop="demand"
                     camera={{ position: [0, 20, 24], fov: 42, near: 0.1, far: 200 }}
-                    dpr={[1, 1.5]}
+                    dpr={[1, 1.25]}
                     gl={{ 
                         antialias: false,
                         powerPreference: "high-performance",
@@ -515,9 +504,9 @@ export default function Chess3D() {
                     }}
                 >
                     <color attach="background" args={["#101317"]} />
-                    <Environment preset="apartment" />
-                    <ambientLight intensity={1.2} />
-                    <directionalLight position={[10, 18, 12]} intensity={0.9} />
+                    <Environment preset="apartment"  />
+                    <ambientLight intensity={0.86} />
+                    <directionalLight position={[10, 18, 12]} intensity={1} />
                     <directionalLight position={[-10, 8, -12]} intensity={0.25} />
                     <Suspense fallback={null}>
                         <ChessBoardScene
