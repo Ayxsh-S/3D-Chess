@@ -5,7 +5,7 @@ import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
 import { Chess } from "chess.js";
 
 const FILES = "abcdefgh";
-const SQUARE_SIZE_FALLBACK = 2;
+const MODEL_URL = "/chess_board.glb";
 const PIECE_VALUE = {
     p: 100,
     n: 320,
@@ -14,6 +14,31 @@ const PIECE_VALUE = {
     q: 900,
     k: 20000,
 };
+
+const WHITE_BACK_ROW = [
+    "W_Rook_1_02",
+    "W_Knight_1_02",
+    "W_Bishop_1_02",
+    "W_Queen_02",
+    "W_King_02",
+    "W_Bishop_2_02",
+    "W_Knight_2_02",
+    "W_Rook_2_02",
+];
+
+const BLACK_BACK_ROW = [
+    "B_Rook_1_01",
+    "B_Knight_1_01",
+    "B_Bishop_1_01",
+    "B_Queen_01",
+    "B_King_01",
+    "B_Bishop_2_01",
+    "B_Knight_2_01",
+    "B_Rook_2_01",
+];
+
+const MODEL_POSITION = [0, 0, 0];
+const MODEL_ROTATION = [-Math.PI/2, 0, 0];
 
 
 function createInitialPieces() {
@@ -139,54 +164,81 @@ function findBestMove(game, depth) {
     return bestMove;
 }
 
+function findNode(nodes, part) {
+    return Object.values(nodes).find((node) => node?.isMesh && node.name && node.name.includes(part));
+}
+
 function getTemplateMap(nodes) {
     return {
         white: {
-            p: nodes.Pawn_White_1,
-            r: nodes.Rook_White_1,
-            n: nodes.Knight_White_1,
-            b: nodes.Bishop_White_1,
-            q: nodes.Queen_White,
-            k: nodes.King_White,
+            p: findNode(nodes, "W_Pawn_1_02"),
+            r: findNode(nodes, "W_Rook_1_02"),
+            n: findNode(nodes, "W_Knight_1_02"),
+            b: findNode(nodes, "W_Bishop_1_02"),
+            q: findNode(nodes, "W_Queen_02"),
+            k: findNode(nodes, "W_King_02"),
         },
         black: {
-            p: nodes.Pawn_Black_1,
-            r: nodes.Rook_Black_1,
-            n: nodes.Knight_Black_1,
-            b: nodes.Bishop_Black_1,
-            q: nodes.Queen_Black,
-            k: nodes.King_Black,
+            p: findNode(nodes, "B_Pawn_1_01"),
+            r: findNode(nodes, "B_Rook_1_01"),
+            n: findNode(nodes, "B_Knight_1_01"),
+            b: findNode(nodes, "B_Bishop_1_01"),
+            q: findNode(nodes, "B_Queen_01"),
+            k: findNode(nodes, "B_King_01"),
         },
     };
 }
 
+function getMeshCenter(mesh) {
+    const box = new THREE.Box3().setFromObject(mesh);
+    return box.getCenter(new THREE.Vector3());
+}
+
 function useModelMetrics(nodes) {
     return useMemo(() => {
-        const geom = nodes?.Board_Under?.geometry;
-        if (!geom) {
+        const boardMeshes = Object.values(nodes).filter(
+            (node) => node?.isMesh && node.name?.includes("Chess_Board")
+        );
+
+        const whiteBack = WHITE_BACK_ROW.map((name) => findNode(nodes, name)).filter(Boolean);
+        const blackBack = BLACK_BACK_ROW.map((name) => findNode(nodes, name)).filter(Boolean);
+        if (!boardMeshes.length || whiteBack.length !== 8 || blackBack.length !== 8) {
             return {
                 ready: false,
-                minX: -7,
-                minY: 2,
-                square: SQUARE_SIZE_FALLBACK,
-                topZ: -3.4,
+                rankCenters: [],
+                fileCenters: [],
+                cellX: 0.2,
+                cellZ: 0.2,
+                topY: 0.2,
             };
         }
 
-        if (!geom.boundingBox) {
-            geom.computeBoundingBox();
-        }
+        boardMeshes.forEach((mesh) => mesh.updateWorldMatrix(true, true));
+        whiteBack.forEach((mesh) => mesh.updateWorldMatrix(true, true));
+        blackBack.forEach((mesh) => mesh.updateWorldMatrix(true, true));
 
-       const box = geom.boundingBox.clone();
-       const size = new THREE.Vector3();
-       box.getSize(size);
+        const boardBox = new THREE.Box3();
+        boardMeshes.forEach((mesh) => boardBox.expandByObject(mesh));
 
+        const whiteBackCenters = whiteBack.map(getMeshCenter);
+        const blackBackCenters = blackBack.map(getMeshCenter);
+
+        const whiteRankX = whiteBackCenters.reduce((sum, c) => sum + c.x, 0) / whiteBackCenters.length;
+        const blackRankX = blackBackCenters.reduce((sum, c) => sum + c.x, 0) / blackBackCenters.length;
+
+        const rankCenters = Array.from(
+            { length: 8},
+            (_, i) => whiteRankX + ((blackRankX-whiteRankX)*i)/7
+        );
+
+        const fileCenters = [...whiteBackCenters].sort((a, b) => a.z-b.z).map((c) => c.z);
         return {
             ready: true,
-            minX: box.min.x,
-            minY: box.min.y,
-            square: size.x/8,
-            topZ: box.max.z+0.08,
+            rankCenters,
+            fileCenters,
+            cellX: Math.abs(rankCenters[1]-rankCenters[0]),
+            cellZ: Math.abs(fileCenters[1]-fileCenters[0]),
+            topY: boardBox.max.y+0.012,
         };
     }, [nodes]);
 }
@@ -205,9 +257,6 @@ function PieceModel({ geometry, material, position, onClick }) {
     );
 }
 
-const MODEL_ROTATION = [-Math.PI/2, 0, 0];
-const MODEL_POSITION = [-7.6072488, -18.6398945, -4.616249];
-
 function makeReusablePieceTemplate(template) {
     const cloned = template.clone(true);
     cloned.updateWorldMatrix(true, true);
@@ -225,7 +274,6 @@ function makeReusablePieceTemplate(template) {
 
     const box = geometry.boundingBox.clone();
     const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
 
     geometry.translate(-center.x, -center.y, -center.z);
 
@@ -235,15 +283,28 @@ function makeReusablePieceTemplate(template) {
         geometry,
         material,
         center,
-        size,
     };
 }
 
-function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orientation, onSquareClick} ) {
-    const { nodes } = useGLTF("/chess.glb");
-    const metrics = useModelMetrics(nodes);
+const BOARD_NODE_NAMES = [
+    "Chess_Board_02_-_Default_0",
+    "Chess_Board_03_-_Default_0",
+    "Chess_Board_07_-_Default_0",
+    "Chess_Board_08_-_Default_0",
+];
 
+function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orientation, onSquareClick} ) {
+    const { nodes } = useGLTF(MODEL_URL);
+    const metrics = useModelMetrics(nodes);
     const templateMap = useMemo(() => getTemplateMap(nodes), [nodes]);
+    console.log(nodes);
+
+    const boardObjects = useMemo(() => {
+        return BOARD_NODE_NAMES
+            .map((name) => nodes[name])
+            .filter(Boolean)
+            .map((obj) => obj.clone(true));
+    }, [nodes]);
 
     // useEffect(() => {
     //     const matteBoard = (root) => {
@@ -282,64 +343,59 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
         return info;
     }, [templateMap]);
 
-    const boardSquares = useMemo(() => {
-        const squares = [];
-        for (let rank = 0; rank < 8; rank++) {
-            for (let file = 0; file < 8; file++) {
-                const shownFile = orientation === "white" ? file : 7-file;
-                const shownRank = orientation === "white" ? rank : 7-rank;
-                const square = `${FILES[file]}${rank+1}`;
-                const x = metrics.minX+metrics.square/2+shownFile*metrics.square;
-                const y = metrics.minY+metrics.square/2+shownRank*metrics.square;
-                const isSelected = selectedSquare === square;
-                const isLegal = legalSquares.includes(square);
-                const isLastFrom = lastMove?.from === square;
-                const isLastTo = lastMove?.to === square;
-                const showOverlay = isSelected || isLegal || isLastFrom || isLastTo;
 
-                squares.push(
-                    <group key={square}>
-                        <mesh
-                            position={[x, y, metrics.topZ]}
-                            onPointerDown={(e) => {
-                                e.stopPropagation();
-                                onSquareClick(square);
-                            }}
-                        >
-                            <boxGeometry args={[metrics.square, 0.03, metrics.square]} />
+    const boardSquares = [];
+    for (let rank = 0; rank < 8; rank++) {
+        for (let file = 0; file < 8; file++) {
+            const shownRank = orientation === "white" ? rank : 7-rank;
+            const shownFile = orientation === "white" ? file : 7-file;
+            const square = `${FILES[file]}${rank + 1}`;
+            const x = metrics.rankCenters[shownRank];
+            const z = metrics.fileCenters[shownFile];
+            const isSelected = selectedSquare === square;
+            const isLegal = legalSquares.includes(square);
+            const isLastFrom = lastMove?.from === square;
+            const isLastTo = lastMove?.to === square;
+            const showOverlay = isSelected || isLegal || isLastFrom || isLastTo;
+
+            boardSquares.push(
+                <group key={square}>
+                    <mesh
+                        position={[x, metrics.topY, z]}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            onSquareClick(square);
+                        }}
+                    >
+                        <boxGeometry args={[metrics.cellX, 0.03, metrics.cellZ]} />
+                        <meshStandardMaterial transparent opacity={0} depthWrite={false} />
+                    </mesh>
+
+                    {showOverlay ? (
+                        <mesh position={[x, metrics.topY, z]}>
+                            <boxGeometry args={[metrics.cellX*0.92, 0.015, metrics.cellZ*0.92]} />
                             <meshStandardMaterial 
                                 transparent
-                                opacity={0}
+                                opacity={isSelected ? 0.42 : isLegal ? 0.28 : 0.18}
+                                color={isSelected ? "#facc15" : isLegal ? "#22c55e" : "#60a5fa"}
                                 depthWrite={false}
                             />
                         </mesh>
-
-                        {showOverlay ? (
-                            <mesh position={[x, y, metrics.topZ]}>
-                                <boxGeometry args={[metrics.square*0.92, 0.015, metrics.square*0.92]} />
-                                <meshStandardMaterial 
-                                    transparent
-                                    opacity={isSelected ? 0.42 : isLegal ? 0.28 : 0.18}
-                                    color={isSelected ? "#facc15" : isLegal ? "#22c55e" : "#60a5fa"}
-                                    depthWrite={false}
-                                />
-                            </mesh>
-                        ) : null}
-                    </group>
-                );
-            }
+                    ) : null}
+                </group>
+            );
         }
-        return squares;
-    }, [orientation, metrics, selectedSquare, legalSquares, lastMove, onSquareClick]);
+    }
 
     return (
-        <group rotation={MODEL_ROTATION} position={MODEL_POSITION}>
-            <primitive object={nodes.Board_Under} />
-            <primitive object={nodes.Board} />
+        <group position={MODEL_POSITION} rotation={MODE} scale={0.01}>
+           {boardObjects.map((obj, i) => (
+                <primitive key={i} object={obj} dispose={null} />
+           ))}
 
-            {boardSquares}
+            {metrics.ready ? boardSquares : null}
 
-            {pieces.map((piece) => {
+            {metrics.ready && pieces.map((piece) => {
                 const info = pieceInfo[`${piece.color}-${piece.type}`];
                 if (!info) return null;
 
@@ -347,9 +403,9 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                 const shownFile = orientation === "white" ? fileIdx : 7-fileIdx;
                 const shownRank = orientation === "white" ? rankIdx : 7-rankIdx;
                 const position = new THREE.Vector3(
-                    metrics.minX+metrics.square/2+shownFile*metrics.square,
-                    metrics.minY+metrics.square/2+shownRank*metrics.square,
-                    info.center.z
+                    metrics.rankCenters[shownRank],
+                    metrics.topY,
+                    metrics.fileCenters[shownFile]
                 );
 
                 return (
@@ -525,11 +581,9 @@ export default function Chess3D() {
             <div className="sub-container">
                 <Canvas
                     frameloop="demand"
-                    camera={{ position: [0, 20, 24], fov: 42, near: 0.1, far: 200 }}
-                   
+                    camera={{ position: [0, 8.5, 11], fov: 60, near: 0.1, far: 100 }}
                     gl={{ 
                         antialias: true,
-                        physicallyCorrectLights: true,
                         toneMapping: THREE.ACESFilmicToneMapping,
                         toneMappingExposure: 1.0,
                         outputColorSpace: THREE.SRGBColorSpace,
@@ -540,7 +594,7 @@ export default function Chess3D() {
                     <color attach="background" args={["#101317"]} />
                     <Environment preset="studio" background={false} environmentIntensity={1} />
                     <ambientLight intensity={0.35} />
-                    <directionalLight position={[10, 18, 12]} intensity={1.2}/>
+                    <directionalLight position={[10, 12, 10]} intensity={1.15}/>
                     <directionalLight position={[-6, 6, -8]} intensity={0.25} />
                     <Suspense fallback={null}>
                         <ChessBoardScene
@@ -555,10 +609,11 @@ export default function Chess3D() {
                     <OrbitControls
                         enablePan={false}
                         enableDamping={false}
-                        minPolarAngle={0.45}
-                        maxPolarAngle={1.25}
-                        minDistance={18}
-                        maxDistance={40}
+                        target={[0, 0.2, 0]}
+                        minPolarAngle={0.25}
+                        maxPolarAngle={1.45}
+                        minDistance={7}
+                        maxDistance={10}
                     />
                 </Canvas>
                 <div className="status">
@@ -635,4 +690,4 @@ export default function Chess3D() {
     );
 }
 
-useGLTF.preload("/chess.glb");
+useGLTF.preload(MODEL_URL);
