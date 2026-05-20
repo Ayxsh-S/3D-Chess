@@ -237,7 +237,7 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
     const metrics = useModelMetrics(nodes);
     const templateMap = useMemo(() => getTemplateMap(nodes), [nodes]);
 
-    console.log(Object.keys(nodes));
+    // console.log(Object.keys(nodes));
 
     // useEffect(() => {
     //     const matteBoard = (root) => {
@@ -294,7 +294,7 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                 squares.push(
                     <group key={square}>
                         <mesh
-                            position={[x, y, metrics.topZ]}
+                            position={[x, y, metrics.topZ+0.01]}
                             onPointerDown={(e) => {
                                 e.stopPropagation();
                                 onSquareClick(square);
@@ -308,7 +308,7 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                             />
                         </mesh>
 
-                        {showOverlay ? (
+                        {/* {showOverlay ? (
                             <mesh position={[x, y, metrics.topZ]}>
                                 <boxGeometry args={[metrics.square*0.92, 0.015, metrics.square*0.92]} />
                                 <meshStandardMaterial 
@@ -318,6 +318,88 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                                     depthWrite={false}
                                 />
                             </mesh>
+                        ) : null} */}
+
+                        {showOverlay ? (
+                            <>
+                                {isSelected && (
+                                    <mesh position={[x, y, metrics.topZ+0.03]} renderOrder={20}>
+                                        <ringGeometry 
+                                            args={[
+                                                metrics.square*0.34,
+                                                metrics.square*0.46,
+                                                48
+                                            ]}
+                                        />
+
+                                        <meshBasicMaterial 
+                                            color="#facc15"
+                                            transparent
+                                            opacity={0.95}
+                                            depthWrite={false}
+                                        />
+                                    </mesh>
+                                )}
+                                {isLegal && !isSelected && (
+                                    <mesh position={[x, y, metrics.topZ+0.025]} renderOrder={20}>
+                                        <circleGeometry args={[metrics.square*0.16, 32]} />
+                                        <meshBasicMaterial
+                                            color="#22c55e"
+                                            transparent
+                                            opacity={0.9}
+                                            depthWrite={false}
+                                        />
+                                    </mesh>
+                                )}
+
+                                {(isLastFrom || isLastTo) && (
+                                    <group position={[x, y, metrics.topZ+0.02]} renderOrder={999}>
+                                        {isLastTo && (
+                                            <>
+                                                <mesh renderOrder={1000}>
+                                                    <ringGeometry 
+                                                        args={[
+                                                            metrics.square*0.3,
+                                                            metrics.square*0.42,
+                                                            64
+                                                        ]}
+                                                    />
+
+                                                    <meshBasicMaterial
+                                                        color="#7dd3fc"
+                                                        transparent
+                                                        opacity={0.55}
+                                                        depthWrite={false}
+                                                        depthTest={false}
+                                                    />
+                                                </mesh>
+
+                                                <mesh position={[0, 0.002, 0]} renderOrder={1000}>
+                                                    <circleGeometry args={[metrics.square*0.28, 48]} />
+                                                    <meshBasicMaterial
+                                                        color="#38bdf8"
+                                                        transparent
+                                                        opacity={0.12}
+                                                        depthTest={false}
+                                                        depthWrite={false}
+                                                    />
+                                                </mesh>
+                                            </>
+                                        )}
+                                        {isLastFrom && (
+                                            <mesh renderOrder={1000}>
+                                                <ringGeometry args={[metrics.square*0.42, metrics.square*0.46, 64]} />
+                                                <meshBasicMaterial 
+                                                    color="#93c5fd"
+                                                    transparent
+                                                    opacity={0.55}
+                                                    depthWrite={false}
+                                                />
+                                            </mesh>
+                                        )}        
+                                    </group>
+                                )}
+                            </>
                         ) : null}
                     </group>
                 );
@@ -551,8 +633,8 @@ export default function Chess3D() {
                         target={BOARD_TARGET}
                         enablePan={false}
                         enableDamping={false}
-                        minPolarAngle={0.85}
-                        maxPolarAngle={1.35}
+                        minPolarAngle={0.15}
+                        maxPolarAngle={Math.PI/2}
                         minDistance={30}
                         maxDistance={80}
                     />
