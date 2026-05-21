@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import * as THREE from "three";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
 import { Chess } from "chess.js";
 
@@ -194,12 +194,12 @@ function useModelMetrics(nodes) {
     }, [nodes]);
 }
 
-function PieceModel({ object, position, onClick }) {
+const PieceModel = memo(function PieceModel({ object, position, onClick }) {
     const instance = useMemo(() => object.clone(true), [object]);
     return (
         <group
             position={position}
-            onPointerDown={(e) => {
+            onClick={(e) => {
                 e.stopPropagation();
                 onClick?.();
             }}
@@ -207,7 +207,7 @@ function PieceModel({ object, position, onClick }) {
             <primitive object={instance} />
         </group>
     );
-}
+});
 
 const MODEL_ROTATION = [-Math.PI/2, 0, 0];
 const MODEL_POSITION = [-7.6072488, -18.6398945, -4.616249];
@@ -300,7 +300,7 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                                 onSquareClick(square);
                             }}
                         >
-                            <boxGeometry args={[metrics.square, 0.03, metrics.square]} />
+                             <planeGeometry args={[metrics.square, metrics.square]} />
                             <meshStandardMaterial 
                                 transparent
                                 opacity={0}
@@ -457,6 +457,32 @@ function statusText(game) {
     return `${side} to move${check}`;
 }
 
+
+function CameraControl() {
+    const controls = useRef();
+    const { invalidate } = useThree();
+
+    return (
+        <OrbitControls
+            ref={controls}
+            makeDefault
+            target={BOARD_TARGET}
+            enablePan={false}
+            enableDamping
+            dampingFactor={0.05}
+            rotateSpeed={1}
+            zoomSpeed={0.6}
+            minPolarAngle={0.15}
+            maxPolarAngle={Math.PI/2}
+            minDistance={30}
+            maxDistance={80}
+            onStart={invalidate}
+            onChange={invalidate}
+            onEnd={invalidate}
+        />
+    );
+}
+
 export default function Chess3D() {
     const gameRef = useRef(new Chess());
     const [fen, setFen] = useState(gameRef.current.fen());
@@ -470,7 +496,7 @@ export default function Chess3D() {
     const [aiDepth, setAiDepth] = useState(2);
     const [status, setStatus] = useState("White to move");
 
-    const applyMove = (moveLike) => {
+    const applyMove = useCallback((moveLike) => {
         const game = gameRef.current;
         const moveInput = { from: moveLike.from, to: moveLike.to };
         if (moveLike.promotion) moveInput.promotion = moveLike.promotion;
@@ -516,7 +542,7 @@ export default function Chess3D() {
         setLastMove({ from: move.from, to: move.to });
         setFen(game.fen());
         return true;
-    };
+    }, []);
 
     const resetGame = () => {
         gameRef.current = new Chess();
@@ -560,7 +586,7 @@ export default function Chess3D() {
         }
     }, [mode, humanColor]);
 
-    const handleSquareClick = (square) => {
+    const handleSquareClick = useCallback((square) => {
         const game = gameRef.current;
         if (game.isGameOver?.()) return;
 
@@ -595,18 +621,17 @@ export default function Chess3D() {
             
         setSelectedSquare(null);
         setLegalSquares([]);
-    };
+    }, [applyMove, humanColor, mode, pieces, selectedSquare]);
 
     return (
         <div className="container">
             <div className="sub-container">
                 <Canvas
                     frameloop="demand"
+                    dpr={[1, 1.5]}
                     camera={{ position: CAMERA_POS, fov: 40, near: 0.1, far: 200 }}
-                   
                     gl={{ 
-                        antialias: true,
-                        physicallyCorrectLights: true,
+                        antialias: false,
                         toneMapping: THREE.ACESFilmicToneMapping,
                         toneMappingExposure: 1.0,
                         outputColorSpace: THREE.SRGBColorSpace,
@@ -615,10 +640,11 @@ export default function Chess3D() {
                     }}
                 >
                     <color attach="background" args={["#101317"]} />
-                    <Environment preset="dawn" background={false} environmentIntensity={1} />
-                    <ambientLight intensity={0.35} />
-                    <directionalLight position={[10, 18, 12]} intensity={1.2}/>
-                    <directionalLight position={[-6, 6, -8]} intensity={0.25} />
+                    <Environment preset="sunset" background={false} resolution={4} blur={1} />
+                    {/* {/* <ambientLight intensity={0.35} /> */}
+                    {/* <hemisphereLight intensity={1} groundColor="#dedede" /> */}
+                    {/* <directionalLight position={[10, 18, 12]} intensity={5}/> */}
+                    {/* <directionalLight position={[-6, 6, -8]} intensity={0.25} />  */}
                     <Suspense fallback={null}>
                         <ChessBoardScene
                             pieces={pieces}
@@ -629,15 +655,7 @@ export default function Chess3D() {
                             onSquareClick={handleSquareClick}
                         />
                     </Suspense>
-                    <OrbitControls
-                        target={BOARD_TARGET}
-                        enablePan={false}
-                        enableDamping={false}
-                        minPolarAngle={0.15}
-                        maxPolarAngle={Math.PI/2}
-                        minDistance={30}
-                        maxDistance={80}
-                    />
+                    <CameraControl />
                 </Canvas>
                 <div className="status">
                     {status}
