@@ -724,7 +724,7 @@ export default function Chess3D() {
 
                 <div className="panel-style">
                     <div className="label-style">How it works</div>
-                    <div className="hint">Click a piece, then click a highlighted destination. Promotion auto-chooses queen. The AI is a built-in minimax engine.</div>
+                    <div className="hint">Drag board to rotate. Click a piece, then click a highlighted square. Promotion auto-chooses queen. The AI is a built-in minimax engine.</div>
                 </div>
             </aside>
         </div>
