@@ -668,10 +668,9 @@ export default function Chess3D() {
                 </div>
                 <div className="pane-style">
                     <div className="label-style">Mode</div>
-                    {/* need some fixes herre */}
                     <div className="row-style">
-                        <button className="" onClick={() => setMode("ai")}>Vs AI</button>
-                        <button className="" onClick={() => setMode("pvp")}>2 Player</button>
+                        <button className={`control-btn ${mode === "ai" ? "active" : ""}`} onClick={() => setMode("ai")}>Vs AI</button>
+                        <button className={`control-btn ${mode === "pvp" ? "active" : ""}`} onClick={() => setMode("pvp")}>2 Player</button>
                     </div>
                 </div>
 
@@ -679,6 +678,7 @@ export default function Chess3D() {
                     <div className="label-style">Side</div>
                     <div className="row-style">
                         <button
+                            className={`control-btn ${humanColor === "white" ? "active" : ""}`}
                             onClick={() => {
                                 setHumanColor("white")
                                 if (mode === "ai") setOrientation("white");
@@ -687,6 +687,7 @@ export default function Chess3D() {
                             White
                         </button>
                         <button
+                            className={`control-btn ${humanColor === "black" ? "active" : ""}`}
                             onClick={() => {
                                 setHumanColor("black")
                                 if (mode === "ai") setOrientation("black");
