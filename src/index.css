@@ -245,6 +245,18 @@ body {
   line-height: 1.6;
 }
 
+.muted-link {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0.82;
+  transition:
+    color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+
 @media (max-width: 1100px) {
   .container {
     grid-template-columns: 1fr;

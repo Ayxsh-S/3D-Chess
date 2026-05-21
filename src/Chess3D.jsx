@@ -725,7 +725,10 @@ export default function Chess3D() {
 
                 <div className="panel-style">
                     <div className="label-style">How it works</div>
-                    <div className="hint">Drag board to rotate. Click a piece, then click a highlighted square. Promotion auto-chooses queen. The AI is a built-in minimax engine.</div>
+                    <div className="hint">Drag board to rotate. Click a piece, then click a highlighted square. Promotion auto-chooses queen. The AI is a built-in minimax engine.
+                        <br></br>
+                        <a className="muted-link" href="https://sketchfab.com/3d-models/chess-e54c2d04d4f74823b69ba4a794fb4500" target="_blank" rel="noreferrer">Model by Verfassen</a>
+                    </div>
                 </div>
             </aside>
         </div>
