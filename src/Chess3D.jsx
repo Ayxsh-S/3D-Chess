@@ -628,7 +628,7 @@ export default function Chess3D() {
             <div className="sub-container">
                 <Canvas
                     frameloop="demand"
-                    dpr={[1, 1.5]}
+                    dpr={[1, 2]}
                     camera={{ position: CAMERA_POS, fov: 40, near: 0.1, far: 200 }}
                     gl={{ 
                         antialias: false,
