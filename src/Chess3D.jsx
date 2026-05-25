@@ -750,8 +750,8 @@ function ChessBoardScene({ pieces, selectedSquare, legalSquares, lastMove, orien
                                     <mesh position={[x, y, metrics.topZ+0.03]} renderOrder={20}>
                                         <ringGeometry 
                                             args={[
-                                                metrics.square*0.34,
-                                                metrics.square*0.46,
+                                                metrics.square*0.33,
+                                                metrics.square*0.5,
                                                 48
                                             ]}
                                         />
@@ -926,6 +926,19 @@ export default function Chess3D() {
     const [orientation, setOrientation] = useState("white");
     const [aiDepth, setAiDepth] = useState(2);
     const [status, setStatus] = useState("White to move");
+    const [capturedPieces, setCapturedPieces] = useState({
+        white: [],
+        black: [],
+    });
+
+    const capturedSvg = {
+        p: "/pieces/pawn.svg",
+        r: "/pieces/rook.svg",
+        n: "/pieces/knight.svg",
+        b: "/pieces/bishop.svg",
+        q: "/pieces/queen.svg",
+        k: "/pieces/king.svg",
+    };
 
     const applyMove = useCallback((moveLike) => {
         const game = gameRef.current;
@@ -933,22 +946,40 @@ export default function Chess3D() {
         if (moveLike.promotion) moveInput.promotion = moveLike.promotion;
         const move = game.move(moveInput);
         if (!move) return false;
+        
+        if (move.captured) {
+            const capturedColor = move.color === "w" ? "black" : "white";
+            const capturer = move.color === "w" ? "white" : "black";
+
+            setCapturedPieces((prev) => ({
+                ...prev,
+                [capturer]: [
+                    ...prev[capturer],
+                    {
+                        id: `${capturedColor}-${move.captured}-${Date.now()}-${Math.random()}`,
+                        color: capturedColor,
+                        type: move.captured,
+                    },
+                ],
+            }));
+        }
 
         setPieces((prev) => {
             const next = prev.map((p) => ( { ...p }));
 
-            const removeAt = (square) => {
-                const idx = next.findIndex((p) => p.square === square);
-                if (idx >= 0) next.splice(idx, 1);
-            };
-
             if (move.captured && !move.flags.includes("e")) {
-                removeAt(move.to);
+                const idx = next.findIndex((p) => p.square === move.to);
+                if (idx >= 0) {
+                    next.splice(idx, 1);
+                }
             }
 
             if (move.flags.includes("e")) {
                 const capturedSquare = `${move.to[0]}${move.from[1]}`;
-                removeAt(capturedSquare);
+                const idx = next.findIndex((p) => p.square === capturedSquare);
+                if (idx >= 0) {
+                    next.splice(idx, 1);
+                }
             }
 
             if (move.flags.includes("k") || move.flags.includes("q")) {
@@ -985,6 +1016,7 @@ export default function Chess3D() {
         setLastMove(null);
         setFen(gameRef.current.fen());
         setStatus("White to move");
+        setCapturedPieces({ white: [], black: [] });
         if (mode === "ai") {
             setOrientation(humanColor);
         } else {
@@ -1014,7 +1046,7 @@ export default function Chess3D() {
             if (curr.isGameOver?.()) return;
             const best = findBestMove(curr, aiDepth);
             if (best && token === searchTokenRef.current && curr.fen() === fenAtStart) {
-                 applyMove(best);
+                applyMove(best);
             }
         }, 100);
         return () => window.clearTimeout(timer);
@@ -1069,7 +1101,7 @@ export default function Chess3D() {
                 <Canvas
                     frameloop="demand"
                     dpr={[1, 2]}
-                    camera={{ position: CAMERA_POS, fov: 40, near: 0.1, far: 200 }}
+                    camera={{ position: CAMERA_POS, fov: 45, near: 0.1, far: 200 }}
                     gl={{ 
                         antialias: false,
                         toneMapping: THREE.ACESFilmicToneMapping,
@@ -1099,6 +1131,34 @@ export default function Chess3D() {
                 </Canvas>
                 <div className="status">
                     {status}
+                </div>
+                <div className="captured-overlay">
+                    <div className="captured-box">
+                        <div className="captured-title">White</div>
+                        <div className="captured-row">
+                            {capturedPieces.white.map((p) => (
+                                <span key={p.id} className={`captured-piece ${p.color}`}>
+                                    <img src={capturedSvg[p.type]}
+                                        alt={`${p.type}`}
+                                        className="captured-piece-img"
+                                    />
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="captured-box">
+                        <div className="captured-title">Black</div>
+                        <div className="captured-row">
+                            {capturedPieces.black.map((p) => (
+                                <span key={p.id} className={`captured-piece ${p.color}`}>
+                                    <img src={capturedSvg[p.type]}
+                                        alt={`${p.type}`}
+                                        className="captured-piece-img"
+                                    />
+                                </span>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 

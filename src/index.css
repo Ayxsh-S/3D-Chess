@@ -256,6 +256,66 @@ body {
     opacity 0.18s ease;
 }
 
+.captured-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.captured-box {
+  min-width: 120px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(10, 12, 16, 0.75);
+  backdrop-filter: blur(6px);
+  color: white;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+
+.captured-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.captured-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.captured-piece {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.captured-piece {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(254, 254, 254, 0.05);
+}
+
+.captured-piece-img {
+  width: 16px;
+  height: 16px;
+  display: block;
+  object-fit: contain;
+}
 
 @media (max-width: 1100px) {
   .container {
